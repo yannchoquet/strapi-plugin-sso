@@ -66,6 +66,11 @@ const oidcSignInCallback = async (ctx) => {
       userInfoEndpointHeaders
     );
 
+    const authorizedRoles = JSON.parse(config['OIDC_AUTHORIZED_ROLE'])
+
+    if (authorizedRoles.length >= 1 && (userResponse.data.roles.filter(value => authorizedRoles.includes(value))).length < 1) {
+      return ctx.send(oauthService.renderSignUpError(`unautorized role`))
+    }
 
     const email =  userResponse.data.email
     const dbUser = await userService.findOneByEmail(email)
@@ -84,12 +89,17 @@ const oidcSignInCallback = async (ctx) => {
       })) : []
 
       const defaultLocale = oauthService.localeFindByHeader(ctx.request.headers)
+
+      //Efipeek HACK
+      const familyName = config['OIDC_FAMILY_NAME_FIELD'].split('.').reduce((acc, key) => acc[key], userResponse.data);
+      const givenName = config['OIDC_GIVEN_NAME_FIELD'].split('.').reduce((acc, key) => acc[key], userResponse.data);
+
       activateUser = await oauthService.createUser(
-        email,
-        userResponse.data[config['OIDC_FAMILY_NAME_FIELD']],
-        userResponse.data[config['OIDC_GIVEN_NAME_FIELD']],
-        defaultLocale,
-        roles,
+          email,
+          familyName,
+          givenName,
+          defaultLocale,
+          roles,
       )
       jwtToken = await tokenService.createJwtToken(activateUser)
 
